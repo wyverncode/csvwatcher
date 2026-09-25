@@ -40,6 +40,8 @@ The program:
 - Waits for a file to stop changing before reading it.
 - Logs successful conversions and errors.
 - Stops cleanly when you press `Ctrl+C` or the process receives `SIGTERM`.
+- Retries files whose conversion fails on a later scan.
+- Rejects input and output directories that overlap.
 
 Run `go run . --help` for the complete option list.
 

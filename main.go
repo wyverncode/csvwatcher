@@ -53,6 +53,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("resolve output directory: %v", err)
 	}
+	if directoriesOverlap(input, output) {
+		log.Fatalf("input and output directories must not overlap: %s and %s", input, output)
+	}
 	info, err := os.Stat(input)
 	if err != nil {
 		log.Fatalf("inspect input directory: %v", err)
@@ -64,28 +67,33 @@ func main() {
 		log.Fatalf("create output directory: %v", err)
 	}
 
-	if err := processExisting(input, output, *stabilityTimeout); err != nil {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if err := processExisting(ctx, input, output, *stabilityTimeout); err != nil {
+		if errors.Is(err, context.Canceled) {
+			return
+		}
 		log.Fatalf("process existing files: %v", err)
 	}
 	if *once {
 		return
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 	if err := watch(ctx, input, output, *watchInterval, *stabilityTimeout); err != nil {
 		log.Fatalf("watch input directory: %v", err)
 	}
 }
 
-func processExisting(inputDir, outputDir string, stabilityTimeout time.Duration) error {
+func processExisting(ctx context.Context, inputDir, outputDir string, stabilityTimeout time.Duration) error {
 	entries, err := os.ReadDir(inputDir)
 	if err != nil {
 		return err
 	}
 	for _, entry := range entries {
 		if !entry.IsDir() && isCSV(entry.Name()) {
-			processAndLog(filepath.Join(inputDir, entry.Name()), outputDir, stabilityTimeout)
+			if !processAndLog(ctx, filepath.Join(inputDir, entry.Name()), outputDir, stabilityTimeout) && ctx.Err() != nil {
+				return ctx.Err()
+			}
 		}
 	}
 	return nil
@@ -105,7 +113,7 @@ func watch(ctx context.Context, inputDir, outputDir string, watchInterval, stabi
 			log.Printf("stopped watching")
 			return nil
 		case <-ticker.C:
-			if err := scanForChanges(inputDir, outputDir, known, stabilityTimeout); err != nil {
+			if err := scanForChanges(ctx, inputDir, outputDir, known, stabilityTimeout); err != nil {
 				log.Printf("watch scan failed: %v", err)
 			}
 		}
@@ -135,7 +143,7 @@ func rememberFiles(inputDir string, known map[string]fileState) error {
 	return nil
 }
 
-func scanForChanges(inputDir, outputDir string, known map[string]fileState, stabilityTimeout time.Duration) error {
+func scanForChanges(ctx context.Context, inputDir, outputDir string, known map[string]fileState, stabilityTimeout time.Duration) error {
 	entries, err := os.ReadDir(inputDir)
 	if err != nil {
 		return err
@@ -154,23 +162,25 @@ func scanForChanges(inputDir, outputDir string, known map[string]fileState, stab
 		if previous, exists := known[path]; exists && previous == current {
 			continue
 		}
-		known[path] = current
-		processAndLog(path, outputDir, stabilityTimeout)
+		if processAndLog(ctx, path, outputDir, stabilityTimeout) {
+			known[path] = current
+		}
 	}
 	return nil
 }
 
-func processAndLog(sourcePath, outputDir string, stabilityTimeout time.Duration) {
-	if err := waitForStableFile(sourcePath, stabilityTimeout); err != nil {
+func processAndLog(ctx context.Context, sourcePath, outputDir string, stabilityTimeout time.Duration) bool {
+	if err := waitForStableFile(ctx, sourcePath, stabilityTimeout); err != nil {
 		log.Printf("conversion failed for %s: %v", sourcePath, err)
-		return
+		return false
 	}
 	outputPath, err := convertFile(sourcePath, outputDir)
 	if err != nil {
 		log.Printf("conversion failed for %s: %v", sourcePath, err)
-		return
+		return false
 	}
 	log.Printf("converted %s -> %s", sourcePath, outputPath)
+	return true
 }
 
 func convertFile(sourcePath, outputDir string) (string, error) {
@@ -274,10 +284,13 @@ func writeAtomic(path string, data []byte) error {
 	return nil
 }
 
-func waitForStableFile(path string, timeout time.Duration) error {
+func waitForStableFile(ctx context.Context, path string, timeout time.Duration) error {
 	deadline := time.Now().Add(timeout)
 	var previous os.FileInfo
 	for time.Now().Before(deadline) {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		current, err := os.Stat(path)
 		if err != nil {
 			return err
@@ -286,11 +299,31 @@ func waitForStableFile(path string, timeout time.Duration) error {
 			return nil
 		}
 		previous = current
-		time.Sleep(defaultStabilityCheckInterval)
+		timer := time.NewTimer(defaultStabilityCheckInterval)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
 	}
 	return fmt.Errorf("file did not become stable within %s", timeout)
 }
 
 func isCSV(name string) bool {
 	return strings.EqualFold(filepath.Ext(name), ".csv")
+}
+
+func directoriesOverlap(first, second string) bool {
+	first = filepath.Clean(first)
+	second = filepath.Clean(second)
+	return pathWithin(first, second) || pathWithin(second, first)
+}
+
+func pathWithin(parent, candidate string) bool {
+	relative, err := filepath.Rel(parent, candidate)
+	if err != nil {
+		return false
+	}
+	return relative == "." || (relative != ".." && !strings.HasPrefix(relative, ".."+string(filepath.Separator)))
 }

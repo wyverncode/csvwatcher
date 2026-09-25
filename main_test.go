@@ -1,10 +1,12 @@
 package main
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestReadCSVHandlesHeadersAndSpecialCharacters(t *testing.T) {
@@ -49,5 +51,52 @@ func TestConvertFileWritesFormattedJSON(t *testing.T) {
 	}
 	if !strings.HasPrefix(string(data), "[\n") {
 		t.Fatalf("expected JSON array, got object:\n%s", data)
+	}
+}
+
+func TestDirectoriesOverlap(t *testing.T) {
+	root := t.TempDir()
+	if !directoriesOverlap(root, root) {
+		t.Fatal("expected identical directories to overlap")
+	}
+	if !directoriesOverlap(root, filepath.Join(root, "output")) {
+		t.Fatal("expected nested directories to overlap")
+	}
+	if directoriesOverlap(root, filepath.Join(t.TempDir(), "output")) {
+		t.Fatal("expected separate directories not to overlap")
+	}
+}
+
+func TestScanRetriesFailedConversion(t *testing.T) {
+	root := t.TempDir()
+	input := filepath.Join(root, "input")
+	output := filepath.Join(root, "output")
+	if err := os.MkdirAll(input, 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(output, 0755); err != nil {
+		t.Fatal(err)
+	}
+	source := filepath.Join(input, "retry.csv")
+	if err := os.WriteFile(source, []byte("name,age\nAda\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	known := make(map[string]fileState)
+	ctx := context.Background()
+	if err := scanForChanges(ctx, input, output, known, time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(output, "retry.json")); !os.IsNotExist(err) {
+		t.Fatal("failed conversion should not create output")
+	}
+	if err := os.WriteFile(source, []byte("name\nAda\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := scanForChanges(ctx, input, output, known, time.Second); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(output, "retry.json")); err != nil {
+		t.Fatalf("expected retry output: %v", err)
 	}
 }
