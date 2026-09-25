@@ -12,6 +12,18 @@ A small Go command-line tool that watches a directory for CSV files and converts
 go run . --input .\incoming --output .\converted
 ```
 
+For a one-time conversion (useful in scripts and CI):
+
+```powershell
+go run . --input .\incoming --output .\converted --once
+```
+
+The scan interval and file readiness timeout can be tuned when needed:
+
+```powershell
+go run . --input .\incoming --output .\converted --interval 250ms --stability-timeout 30s
+```
+
 The program:
 
 - Converts CSV files already present in the input directory at startup.
@@ -21,6 +33,9 @@ The program:
 - Writes one indented JSON array per CSV file.
 - Waits for a file to stop changing before reading it.
 - Logs successful conversions and errors.
+- Stops cleanly when you press `Ctrl+C` or the process receives `SIGTERM`.
+
+Run `go run . --help` for the complete option list.
 
 Build a local binary with:
 
@@ -38,3 +53,7 @@ gofmt -w .
 go test ./...
 go build ./...
 ```
+
+The repository includes GitHub Actions CI for formatting, tests, and builds. Keep generated
+JSON and local input/output folders out of commits; the included `.gitignore` already covers
+the standard local paths.

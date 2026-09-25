@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"context"
 	"encoding/csv"
 	"encoding/json"
 	"errors"
@@ -10,25 +11,38 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"time"
 )
 
 const (
-	stabilityCheckInterval = 100 * time.Millisecond
-	stabilityTimeout       = 10 * time.Second
-	watchInterval          = time.Second
+	defaultStabilityCheckInterval = 100 * time.Millisecond
+	defaultStabilityTimeout       = 10 * time.Second
+	defaultWatchInterval          = time.Second
 )
 
 func main() {
-	inputDir := flag.String("input", "", "directory containing CSV files")
-	outputDir := flag.String("output", "", "directory for converted JSON files")
+	inputDir := flag.String("input", "", "directory containing CSV files (required)")
+	outputDir := flag.String("output", "", "directory for converted JSON files (required)")
+	watchInterval := flag.Duration("interval", defaultWatchInterval, "how often to scan for changed files")
+	stabilityTimeout := flag.Duration("stability-timeout", defaultStabilityTimeout, "maximum time to wait for a file to stop changing")
+	once := flag.Bool("once", false, "convert existing files and exit without watching")
+	flag.Usage = func() {
+		fmt.Fprintf(flag.CommandLine.Output(), "Usage: %s --input DIR --output DIR [options]\n\n", os.Args[0])
+		fmt.Fprintln(flag.CommandLine.Output(), "Convert CSV files to formatted JSON and watch for changes.")
+		flag.PrintDefaults()
+	}
 	flag.Parse()
 
 	if *inputDir == "" || *outputDir == "" {
 		flag.Usage()
 		os.Exit(2)
+	}
+	if *watchInterval <= 0 || *stabilityTimeout <= 0 {
+		log.Fatal("intervals must be greater than zero")
 	}
 
 	input, err := filepath.Abs(*inputDir)
@@ -39,32 +53,45 @@ func main() {
 	if err != nil {
 		log.Fatalf("resolve output directory: %v", err)
 	}
+	info, err := os.Stat(input)
+	if err != nil {
+		log.Fatalf("inspect input directory: %v", err)
+	}
+	if !info.IsDir() {
+		log.Fatalf("input path is not a directory: %s", input)
+	}
 	if err := os.MkdirAll(output, 0755); err != nil {
 		log.Fatalf("create output directory: %v", err)
 	}
 
-	if err := processExisting(input, output); err != nil {
+	if err := processExisting(input, output, *stabilityTimeout); err != nil {
 		log.Fatalf("process existing files: %v", err)
 	}
-	if err := watch(input, output); err != nil {
+	if *once {
+		return
+	}
+
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	if err := watch(ctx, input, output, *watchInterval, *stabilityTimeout); err != nil {
 		log.Fatalf("watch input directory: %v", err)
 	}
 }
 
-func processExisting(inputDir, outputDir string) error {
+func processExisting(inputDir, outputDir string, stabilityTimeout time.Duration) error {
 	entries, err := os.ReadDir(inputDir)
 	if err != nil {
 		return err
 	}
 	for _, entry := range entries {
 		if !entry.IsDir() && isCSV(entry.Name()) {
-			processAndLog(filepath.Join(inputDir, entry.Name()), outputDir)
+			processAndLog(filepath.Join(inputDir, entry.Name()), outputDir, stabilityTimeout)
 		}
 	}
 	return nil
 }
 
-func watch(inputDir, outputDir string) error {
+func watch(ctx context.Context, inputDir, outputDir string, watchInterval, stabilityTimeout time.Duration) error {
 	log.Printf("watching %s; output directory is %s", inputDir, outputDir)
 	known := make(map[string]fileState)
 	if err := rememberFiles(inputDir, known); err != nil {
@@ -73,9 +100,14 @@ func watch(inputDir, outputDir string) error {
 	ticker := time.NewTicker(watchInterval)
 	defer ticker.Stop()
 	for {
-		<-ticker.C
-		if err := scanForChanges(inputDir, outputDir, known); err != nil {
-			log.Printf("watch scan failed: %v", err)
+		select {
+		case <-ctx.Done():
+			log.Printf("stopped watching")
+			return nil
+		case <-ticker.C:
+			if err := scanForChanges(inputDir, outputDir, known, stabilityTimeout); err != nil {
+				log.Printf("watch scan failed: %v", err)
+			}
 		}
 	}
 }
@@ -103,7 +135,7 @@ func rememberFiles(inputDir string, known map[string]fileState) error {
 	return nil
 }
 
-func scanForChanges(inputDir, outputDir string, known map[string]fileState) error {
+func scanForChanges(inputDir, outputDir string, known map[string]fileState, stabilityTimeout time.Duration) error {
 	entries, err := os.ReadDir(inputDir)
 	if err != nil {
 		return err
@@ -123,13 +155,13 @@ func scanForChanges(inputDir, outputDir string, known map[string]fileState) erro
 			continue
 		}
 		known[path] = current
-		processAndLog(path, outputDir)
+		processAndLog(path, outputDir, stabilityTimeout)
 	}
 	return nil
 }
 
-func processAndLog(sourcePath, outputDir string) {
-	if err := waitForStableFile(sourcePath); err != nil {
+func processAndLog(sourcePath, outputDir string, stabilityTimeout time.Duration) {
+	if err := waitForStableFile(sourcePath, stabilityTimeout); err != nil {
 		log.Printf("conversion failed for %s: %v", sourcePath, err)
 		return
 	}
@@ -242,8 +274,8 @@ func writeAtomic(path string, data []byte) error {
 	return nil
 }
 
-func waitForStableFile(path string) error {
-	deadline := time.Now().Add(stabilityTimeout)
+func waitForStableFile(path string, timeout time.Duration) error {
+	deadline := time.Now().Add(timeout)
 	var previous os.FileInfo
 	for time.Now().Before(deadline) {
 		current, err := os.Stat(path)
@@ -254,9 +286,9 @@ func waitForStableFile(path string) error {
 			return nil
 		}
 		previous = current
-		time.Sleep(stabilityCheckInterval)
+		time.Sleep(defaultStabilityCheckInterval)
 	}
-	return fmt.Errorf("file did not become stable within %s", stabilityTimeout)
+	return fmt.Errorf("file did not become stable within %s", timeout)
 }
 
 func isCSV(name string) bool {
