@@ -12,6 +12,12 @@ A small Go command-line tool that watches a directory for CSV files and converts
 go run . --input .\incoming --output .\converted
 ```
 
+Install the published CLI with:
+
+```powershell
+go install github.com/wyverncode/csvwatcher@latest
+```
+
 For a one-time conversion (useful in scripts and CI):
 
 ```powershell
