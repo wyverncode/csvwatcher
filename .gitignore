@@ -1,0 +1,16 @@
+# Build artifacts
+/csvwatcher
+/csvwatcher.exe
+
+# Local watcher directories
+/incoming/
+/converted/
+
+# Go tooling
+coverage.out
+*.test
+
+# IDE and OS files
+.DS_Store
+.idea/
+.vscode/
