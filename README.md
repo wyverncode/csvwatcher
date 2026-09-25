@@ -1,89 +1,113 @@
 # CSV Watcher
 
-A small Go command-line tool that watches a directory for CSV files and converts them to formatted JSON.
+[![CI](https://github.com/wyverncode/csvwatcher/actions/workflows/ci.yml/badge.svg)](https://github.com/wyverncode/csvwatcher/actions/workflows/ci.yml)
+[![Go Reference](https://pkg.go.dev/badge/github.com/wyverncode/csvwatcher.svg)](https://pkg.go.dev/github.com/wyverncode/csvwatcher)
+[![Latest Release](https://img.shields.io/github/v/release/wyverncode/csvwatcher)](https://github.com/wyverncode/csvwatcher/releases)
 
-It also includes an operating-system-agnostic local web interface that runs in any modern browser.
+Cross-platform Go tooling that watches a folder for CSV files and converts them into
+validated, human-readable JSON. Use the command line for automation or the local browser
+interface for interactive workflows.
 
-## Requirements
+## Features
 
-- Go 1.22 or newer
+- Processes CSV files already present at startup.
+- Watches for new and changed `.csv` files.
+- Uses the first row as JSON property names.
+- Preserves quoted values and safely escapes JSON characters.
+- Rejects empty or duplicate headers and mismatched row lengths.
+- Waits for files to stop changing before conversion.
+- Retries failed conversions on a later scan.
+- Publishes output atomically to prevent partial JSON files.
+- Supports graceful shutdown with `Ctrl+C` or `SIGTERM`.
+- Includes a standard-library-only local web interface.
 
-## Usage
+## Quick start
 
-```powershell
-go run . --input .\incoming --output .\converted
-```
+### CLI
 
-Launch the local web interface:
-
-```powershell
-go run . --gui
-```
-
-Then open `http://127.0.0.1:8080` in a browser. The GUI supports folder selection through
-path fields, continuous watching, live activity logs, and clean stop behavior. The CLI remains
-available for automation and headless environments.
-
-Install the published CLI with:
+Requirements: Go 1.22 or newer.
 
 ```powershell
 go install github.com/wyverncode/csvwatcher@latest
+csvwatcher --input .\incoming --output .\converted
 ```
 
-For a one-time conversion (useful in scripts and CI):
+For a one-time conversion:
 
 ```powershell
-go run . --input .\incoming --output .\converted --once
+csvwatcher --input .\incoming --output .\converted --once
 ```
 
-The scan interval and file readiness timeout can be tuned when needed:
+### Browser interface
 
 ```powershell
-go run . --input .\incoming --output .\converted --interval 250ms --stability-timeout 30s
+csvwatcher --gui
 ```
 
-The program:
+Open <http://127.0.0.1:8080>. The interface provides folder configuration, start/stop
+controls, status, and live activity logs. The server binds to localhost only.
 
-- Converts CSV files already present in the input directory at startup.
-- Watches for new or changed `.csv` files.
-- Uses the first CSV row as JSON property names.
-- Preserves quoted values and escapes JSON safely.
-- Writes one indented JSON array per CSV file.
-- Waits for a file to stop changing before reading it.
-- Logs successful conversions and errors.
-- Stops cleanly when you press `Ctrl+C` or the process receives `SIGTERM`.
-- Retries files whose conversion fails on a later scan.
-- Rejects input and output directories that overlap.
+## Configuration
 
-Run `go run . --help` for the complete option list.
+| Flag | Default | Purpose |
+| --- | --- | --- |
+| `--input` | — | Input folder containing CSV files; required for CLI mode |
+| `--output` | — | Output folder for JSON files; required for CLI mode |
+| `--once` | `false` | Convert current files and exit |
+| `--interval` | `1s` | Scan interval for changed files |
+| `--stability-timeout` | `10s` | Maximum wait for a file to stop changing |
+| `--gui` | `false` | Start the local browser interface |
 
-Build a local binary with:
+Run `csvwatcher --help` for the authoritative option list.
+
+## Conversion contract
+
+Each CSV file produces a JSON array with the same base name:
+
+```text
+incoming/customers.csv
+converted/customers.json
+```
+
+The first CSV row is the header. Every subsequent row must contain exactly the same number
+of fields. Empty headers and duplicate headers are rejected. JSON output is indented with
+two spaces and ends with a newline.
+
+## Build from source
 
 ```powershell
+git clone https://github.com/wyverncode/csvwatcher.git
+cd csvwatcher
+go test ./...
 go build -o csvwatcher.exe .
 .\csvwatcher.exe --input .\incoming --output .\converted
 ```
 
-## Development
-
-Run formatting, tests, and a build before opening a pull request:
+For a local GUI build:
 
 ```powershell
-gofmt -w .
-go test ./...
-go build ./...
-```
-
-Build the application with:
-
-```powershell
-go build -o csvwatcher.exe .
 .\csvwatcher.exe --gui
 ```
 
-The GUI uses only Go's standard library and is therefore usable on Windows, macOS, and Linux
-without native GUI toolkit dependencies.
+## Development
 
-The repository includes GitHub Actions CI for formatting, tests, and builds. Keep generated
-JSON and local input/output folders out of commits; the included `.gitignore` already covers
-the standard local paths.
+The repository uses standard Go tooling and GitHub Actions CI:
+
+```powershell
+gofmt -w .
+go vet ./...
+go test -race ./...
+go build ./...
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the pull request workflow and quality
+expectations. Generated JSON and local input/output folders are ignored by default.
+
+## Security and support
+
+The GUI is intentionally bound to `127.0.0.1`; do not expose it directly to an untrusted
+network. See [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
+
+## License
+
+Released under the [MIT License](LICENSE).
