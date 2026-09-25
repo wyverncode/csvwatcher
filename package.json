@@ -1,0 +1,42 @@
+{
+  "name": "@wyvercode/csvwatcher",
+  "version": "1.0.0",
+  "description": "Cross-platform CSV-to-JSON folder watcher with CLI and local browser interface.",
+  "type": "module",
+  "bin": {
+    "csvwatcher": "./bin/csvwatcher.js"
+  },
+  "files": [
+    "bin",
+    "src",
+    "LICENSE",
+    "README.md",
+    "SECURITY.md"
+  ],
+  "scripts": {
+    "check": "npm run format:check && npm run lint && npm test",
+    "format:check": "prettier --check .",
+    "lint": "eslint .",
+    "test": "node --test",
+    "start": "node ./bin/csvwatcher.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "publishConfig": {
+    "registry": "https://npm.pkg.github.com"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/wyvercode/csvwatcher.git"
+  },
+  "bugs": {
+    "url": "https://github.com/wyvercode/csvwatcher/issues"
+  },
+  "homepage": "https://github.com/wyvercode/csvwatcher#readme",
+  "license": "MIT",
+  "devDependencies": {
+    "eslint": "^9.17.0",
+    "prettier": "^3.4.2"
+  }
+}

@@ -1,113 +1,99 @@
 # CSV Watcher
 
-[![CI](https://github.com/wyverncode/csvwatcher/actions/workflows/ci.yml/badge.svg)](https://github.com/wyverncode/csvwatcher/actions/workflows/ci.yml)
-[![Go Reference](https://pkg.go.dev/badge/github.com/wyverncode/csvwatcher.svg)](https://pkg.go.dev/github.com/wyverncode/csvwatcher)
-[![Latest Release](https://img.shields.io/github/v/release/wyverncode/csvwatcher)](https://github.com/wyverncode/csvwatcher/releases)
+[![CI](https://github.com/wyvercode/csvwatcher/actions/workflows/ci.yml/badge.svg)](https://github.com/wyvercode/csvwatcher/actions/workflows/ci.yml)
+[![npm](https://img.shields.io/npm/v/%40wyvercode%2Fcsvwatcher)](https://github.com/wyvercode/csvwatcher/packages)
 
-Cross-platform Go tooling that watches a folder for CSV files and converts them into
-validated, human-readable JSON. Use the command line for automation or the local browser
-interface for interactive workflows.
+Cross-platform Node.js tooling that watches a folder for CSV files and converts them into
+validated, human-readable JSON. Use the CLI for automation or the local browser interface
+for interactive workflows.
 
-## Features
+## Requirements
 
-- Processes CSV files already present at startup.
-- Watches for new and changed `.csv` files.
-- Uses the first row as JSON property names.
-- Preserves quoted values and safely escapes JSON characters.
-- Rejects empty or duplicate headers and mismatched row lengths.
-- Waits for files to stop changing before conversion.
-- Retries failed conversions on a later scan.
-- Publishes output atomically to prevent partial JSON files.
-- Supports graceful shutdown with `Ctrl+C` or `SIGTERM`.
-- Includes a standard-library-only local web interface.
+- Node.js 20 or newer
+- npm 10 or newer
+
+## Install
+
+```bash
+npm install -g @wyvercode/csvwatcher --registry=https://npm.pkg.github.com
+```
+
+GitHub Packages requires a GitHub personal access token with `read:packages`:
+
+```bash
+npm login --scope=@wyvercode --registry=https://npm.pkg.github.com
+```
 
 ## Quick start
 
-### CLI
-
-Requirements: Go 1.22 or newer.
-
-```powershell
-go install github.com/wyverncode/csvwatcher@latest
-csvwatcher --input .\incoming --output .\converted
+```bash
+csvwatcher --input ./incoming --output ./converted
 ```
 
-For a one-time conversion:
+Convert existing files once and exit:
 
-```powershell
-csvwatcher --input .\incoming --output .\converted --once
+```bash
+csvwatcher --input ./incoming --output ./converted --once
 ```
 
-### Browser interface
+Launch the local browser interface:
 
-```powershell
+```bash
 csvwatcher --gui
 ```
 
-Open <http://127.0.0.1:8080>. The interface provides folder configuration, start/stop
-controls, status, and live activity logs. The server binds to localhost only.
+Open <http://127.0.0.1:8080>. The GUI is localhost-only and includes folder configuration,
+start/stop controls, status, and live activity logs.
 
-## Configuration
+## CLI options
 
-| Flag | Default | Purpose |
-| --- | --- | --- |
-| `--input` | — | Input folder containing CSV files; required for CLI mode |
-| `--output` | — | Output folder for JSON files; required for CLI mode |
-| `--once` | `false` | Convert current files and exit |
-| `--interval` | `1s` | Scan interval for changed files |
-| `--stability-timeout` | `10s` | Maximum wait for a file to stop changing |
-| `--gui` | `false` | Start the local browser interface |
-
-Run `csvwatcher --help` for the authoritative option list.
+| Option                         | Default | Description                         |
+| ------------------------------ | ------- | ----------------------------------- |
+| `--input DIR`                  | —       | Input folder containing CSV files   |
+| `--output DIR`                 | —       | Output folder for JSON files        |
+| `--once`                       | `false` | Convert current files and exit      |
+| `--interval DURATION`          | `1s`    | Scan interval (`250ms`, `1s`, `1m`) |
+| `--stability-timeout DURATION` | `10s`   | Maximum file-readiness wait         |
+| `--gui`                        | `false` | Start the local browser interface   |
+| `--help`                       | —       | Show usage                          |
 
 ## Conversion contract
 
-Each CSV file produces a JSON array with the same base name:
+The first CSV row becomes the JSON object keys. Every later row must have exactly the same
+number of fields. Empty or duplicate headers and malformed quoted fields are rejected.
 
 ```text
-incoming/customers.csv
-converted/customers.json
+incoming/customers.csv  ->  converted/customers.json
 ```
 
-The first CSV row is the header. Every subsequent row must contain exactly the same number
-of fields. Empty headers and duplicate headers are rejected. JSON output is indented with
-two spaces and ends with a newline.
-
-## Build from source
-
-```powershell
-git clone https://github.com/wyverncode/csvwatcher.git
-cd csvwatcher
-go test ./...
-go build -o csvwatcher.exe .
-.\csvwatcher.exe --input .\incoming --output .\converted
-```
-
-For a local GUI build:
-
-```powershell
-.\csvwatcher.exe --gui
-```
+Output is a two-space-indented JSON array, written atomically so readers never see a partial
+file. Failed files are retried on a later scan.
 
 ## Development
 
-The repository uses standard Go tooling and GitHub Actions CI:
-
-```powershell
-gofmt -w .
-go vet ./...
-go test -race ./...
-go build ./...
+```bash
+git clone https://github.com/wyvercode/csvwatcher.git
+cd csvwatcher
+npm ci
+npm run check
+npm start -- --input ./incoming --output ./converted
 ```
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the pull request workflow and quality
-expectations. Generated JSON and local input/output folders are ignored by default.
+`npm run check` runs Prettier validation, ESLint, and the Node.js test suite. GitHub Actions
+also runs the check suite on every push and pull request.
 
-## Security and support
+## Publishing
 
-The GUI is intentionally bound to `127.0.0.1`; do not expose it directly to an untrusted
-network. See [SECURITY.md](SECURITY.md) for reporting vulnerabilities.
+The package is scoped as `@wyvercode/csvwatcher` and publishes to GitHub Packages. Maintainers
+can publish from a clean `main` checkout with:
+
+```bash
+npm publish
+```
+
+The release workflow publishes when a `v*` tag is pushed. See [CONTRIBUTING.md](CONTRIBUTING.md)
+and [SECURITY.md](SECURITY.md) for repository standards.
 
 ## License
 
-Released under the [MIT License](LICENSE).
+MIT. See [LICENSE](LICENSE).

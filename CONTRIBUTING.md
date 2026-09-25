@@ -7,11 +7,9 @@ Check existing issues before opening a new one. For security vulnerabilities, fo
 
 ## Local workflow
 
-```powershell
-gofmt -w .
-go vet ./...
-go test -race ./...
-go build ./...
+```bash
+npm ci
+npm run check
 ```
 
 Keep changes focused, preserve the CLI and conversion contract, and add tests for behavior

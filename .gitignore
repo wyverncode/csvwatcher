@@ -1,6 +1,8 @@
 # Build artifacts
 /csvwatcher
 /csvwatcher.exe
+/node_modules/
+/npm-debug.log*
 
 # Local watcher directories
 /incoming/
