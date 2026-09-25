@@ -2,6 +2,8 @@
 
 A small Go command-line tool that watches a directory for CSV files and converts them to formatted JSON.
 
+It also includes an operating-system-agnostic local web interface that runs in any modern browser.
+
 ## Requirements
 
 - Go 1.22 or newer
@@ -11,6 +13,16 @@ A small Go command-line tool that watches a directory for CSV files and converts
 ```powershell
 go run . --input .\incoming --output .\converted
 ```
+
+Launch the local web interface:
+
+```powershell
+go run . --gui
+```
+
+Then open `http://127.0.0.1:8080` in a browser. The GUI supports folder selection through
+path fields, continuous watching, live activity logs, and clean stop behavior. The CLI remains
+available for automation and headless environments.
 
 Install the published CLI with:
 
@@ -61,6 +73,16 @@ gofmt -w .
 go test ./...
 go build ./...
 ```
+
+Build the application with:
+
+```powershell
+go build -o csvwatcher.exe .
+.\csvwatcher.exe --gui
+```
+
+The GUI uses only Go's standard library and is therefore usable on Windows, macOS, and Linux
+without native GUI toolkit dependencies.
 
 The repository includes GitHub Actions CI for formatting, tests, and builds. Keep generated
 JSON and local input/output folders out of commits; the included `.gitignore` already covers

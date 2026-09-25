@@ -27,6 +27,7 @@ const (
 func main() {
 	inputDir := flag.String("input", "", "directory containing CSV files (required)")
 	outputDir := flag.String("output", "", "directory for converted JSON files (required)")
+	gui := flag.Bool("gui", false, "launch the cross-platform desktop interface")
 	watchInterval := flag.Duration("interval", defaultWatchInterval, "how often to scan for changed files")
 	stabilityTimeout := flag.Duration("stability-timeout", defaultStabilityTimeout, "maximum time to wait for a file to stop changing")
 	once := flag.Bool("once", false, "convert existing files and exit without watching")
@@ -37,6 +38,10 @@ func main() {
 	}
 	flag.Parse()
 
+	if *gui {
+		runGUI()
+		return
+	}
 	if *inputDir == "" || *outputDir == "" {
 		flag.Usage()
 		os.Exit(2)
