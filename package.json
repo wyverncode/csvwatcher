@@ -1,5 +1,5 @@
 {
-  "name": "@wyvercode/csvwatcher",
+  "name": "@wyverncode/csvwatcher",
   "version": "1.0.0",
   "description": "Cross-platform CSV-to-JSON folder watcher with CLI and local browser interface.",
   "type": "module",
@@ -28,12 +28,12 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/wyvercode/csvwatcher.git"
+    "url": "git+https://github.com/wyverncode/csvwatcher.git"
   },
   "bugs": {
-    "url": "https://github.com/wyvercode/csvwatcher/issues"
+    "url": "https://github.com/wyverncode/csvwatcher/issues"
   },
-  "homepage": "https://github.com/wyvercode/csvwatcher#readme",
+  "homepage": "https://github.com/wyverncode/csvwatcher#readme",
   "license": "MIT",
   "devDependencies": {
     "eslint": "^9.17.0",
