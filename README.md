@@ -116,7 +116,8 @@ The release workflow publishes when a `v*` tag is pushed. See [CONTRIBUTING.md](
 and [SECURITY.md](SECURITY.md) for repository standards.
 
 For a complete beginner guide, operational reference, architecture overview, and
-troubleshooting steps, see the [project Wiki](https://github.com/wyverncode/csvwatcher/wiki).
+troubleshooting steps, see the [project Wiki](https://github.com/wyverncode/csvwatcher/wiki)
+or the [documentation source in this repository](docs/wiki/Home.md).
 
 ## License
 
